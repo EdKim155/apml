@@ -1,498 +1,124 @@
 <!--
 ==============================================================
-КОД ДЛЯ СТРАНИЦЫ УСПЕХА (ZERO BLOCK)
+МИНИМАЛИСТИЧНЫЙ КОД ДЛЯ СТРАНИЦЫ УСПЕХА
 ==============================================================
 Страница: https://apml.online/groupa-reg-squad-masters-success-21nov
 
-ИНСТРУКЦИЯ ПО УСТАНОВКЕ:
-1. Откройте страницу успеха в редакторе Tilda
+УСТАНОВКА:
+1. Откройте страницу в редакторе Tilda
 2. Добавьте блок "T123: Zero Block"
-3. Скопируйте весь код ниже в HTML-редактор Zero Block
-4. ВАЖНО: Замените YOUR-BACKEND-URL на ваш реальный URL backend сервера
-5. На странице должна быть ссылка на Telegram чат, она будет автоматически показана/скрыта
-6. Сохраните и опубликуйте страницу
+3. Вставьте код ниже
+4. ВАЖНО: Замените YOUR-BACKEND-URL на https://ucnominal.ru
+5. На странице должна быть ссылка на Telegram с href="https://t.me/+StEnmHkKvGdlNmUy"
+6. Добавьте к ссылке style="display:none" - скрипт покажет её автоматически
+7. Сохраните и опубликуйте
 
-ВАЖНО:
-- Ссылка на Telegram чат должна иметь ID "telegram-chat-link" или href содержащий "t.me"
-- По умолчанию ссылка должна быть скрыта (style="display:none")
+Этот скрипт работает ПОЛНОСТЬЮ В ФОНЕ без визуальных элементов
 ==============================================================
 -->
 
-<!-- HTML блоки для отображения статусов -->
-<div id="apml-success-container" style="max-width: 700px; margin: 40px auto; padding: 20px;">
-
-  <!-- Блок проверки оплаты -->
-  <div id="checking-payment-block" style="display: block; text-align: center; padding: 30px; background: #f5f5f5; border-radius: 10px;">
-    <div style="display: inline-block; width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #4CAF50; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-    <h3 style="margin-top: 20px;">Проверяем статус оплаты...</h3>
-    <p style="color: #666;">Пожалуйста, подождите несколько секунд</p>
-  </div>
-
-  <!-- Блок успешной оплаты -->
-  <div id="payment-success-block" style="display: none; padding: 30px; background: #e8f5e9; border-radius: 10px; border-left: 5px solid #4CAF50;">
-    <h2 style="color: #2e7d32; margin-top: 0;">Оплата успешно завершена!</h2>
-    <p style="font-size: 18px;">Спасибо за оплату участия в турнире Squad Masters.</p>
-    <p>Команда: <strong id="success-team-name">-</strong></p>
-    <hr style="margin: 20px 0; border: none; border-top: 1px solid #c8e6c9;">
-    <p style="font-size: 16px; line-height: 1.6;">
-      Теперь вы можете присоединиться к капитанскому чату турнира.
-      Там вы получите всю необходимую информацию о предстоящих играх.
-    </p>
-  </div>
-
-  <!-- Блок ожидания подтверждения -->
-  <div id="payment-pending-block" style="display: none; padding: 30px; background: #fff3e0; border-radius: 10px; border-left: 5px solid #ff9800;">
-    <h3 style="color: #e65100; margin-top: 0;">Проверяем вашу оплату...</h3>
-    <p>Мы получили ваш платеж и проверяем его статус.</p>
-    <p>Обычно это занимает несколько минут. Если у вас возникли проблемы, пожалуйста, свяжитесь с организаторами турнира.</p>
-    <p style="margin-top: 20px;">
-      <button onclick="location.reload()" style="padding: 10px 20px; background: #ff9800; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
-        Обновить статус
-      </button>
-    </p>
-  </div>
-
-  <!-- Блок ошибки -->
-  <div id="payment-error-block" style="display: none; padding: 30px; background: #ffebee; border-radius: 10px; border-left: 5px solid #f44336;">
-    <h3 style="color: #c62828; margin-top: 0;">Оплата не найдена</h3>
-    <p>Мы не смогли найти информацию о вашей оплате.</p>
-    <p>Возможные причины:</p>
-    <ul>
-      <li>Вы еще не завершили оплату</li>
-      <li>Платеж еще обрабатывается банком</li>
-      <li>Произошла техническая ошибка</li>
-    </ul>
-    <p style="margin-top: 20px;">
-      <a href="https://apml.online/groupa-payments-squad-masters-21nov"
-         style="display: inline-block; padding: 12px 24px; background: #2196F3; color: white; text-decoration: none; border-radius: 5px; margin-right: 10px;">
-        Попробовать оплатить снова
-      </a>
-      <button onclick="location.reload()" style="padding: 12px 24px; background: #757575; color: white; border: none; border-radius: 5px; cursor: pointer;">
-        Обновить страницу
-      </button>
-    </p>
-  </div>
-
-</div>
-
-<style>
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Стили для ссылки на Telegram */
-#telegram-chat-link,
-a[href*="t.me"] {
-  transition: all 0.3s ease;
-}
-
-.telegram-link-revealed {
-  animation: fadeIn 0.5s ease-in;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-</style>
-
 <script>
-/**
- * APML Squad Masters - Обработчик страницы успеха
- *
- * Этот скрипт выполняет следующие действия:
- * 1. Проверяет статус оплаты через backend API
- * 2. Показывает соответствующее сообщение
- * 3. Открывает доступ к ссылке на Telegram чат при успешной оплате
- * 4. Очищает localStorage после подтверждения оплаты
- */
-
 (function() {
   'use strict';
 
-  // ============================================
-  // КОНФИГУРАЦИЯ
-  // ============================================
+  // ВАЖНО: Замените на ваш backend URL
+  const BACKEND_API_URL = 'https://YOUR-BACKEND-URL';
 
-  // ВАЖНО: Замените на URL вашего backend сервера!
-  const BACKEND_API_URL = 'https://YOUR-BACKEND-URL.com';
-
-  const API_ENDPOINTS = {
-    checkPayment: `${BACKEND_API_URL}/api/check-payment`,
-    checkOrder: `${BACKEND_API_URL}/api/check-order`
-  };
-
-  const TELEGRAM_CHAT_URL = 'https://t.me/+StEnmHkKvGdlNmUy';
-
-  // ============================================
-  // ОСНОВНЫЕ ФУНКЦИИ
-  // ============================================
-
-  /**
-   * Получение данных из localStorage
-   */
+  // Получаем данные из localStorage
   function getStoredData() {
     try {
       const registrationData = localStorage.getItem('apml_registration_data');
-      const orderId = localStorage.getItem('apml_payment_order_id');
-
-      return {
-        registrationData: registrationData ? JSON.parse(registrationData) : null,
-        orderId: orderId
-      };
+      return registrationData ? JSON.parse(registrationData) : null;
     } catch (error) {
-      console.error('❌ Ошибка чтения localStorage:', error);
-      return { registrationData: null, orderId: null };
+      return null;
     }
   }
 
-  /**
-   * Показ определенного блока
-   */
-  function showBlock(blockId) {
-    // Скрываем все блоки
-    const blocks = [
-      'checking-payment-block',
-      'payment-success-block',
-      'payment-pending-block',
-      'payment-error-block'
-    ];
-
-    blocks.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'none';
-    });
-
-    // Показываем нужный блок
-    const targetBlock = document.getElementById(blockId);
-    if (targetBlock) {
-      targetBlock.style.display = 'block';
-    }
-
-    console.log(`📋 Показан блок: ${blockId}`);
-  }
-
-  /**
-   * Проверка статуса оплаты по названию команды
-   */
-  async function checkPaymentByTeamName(teamName) {
+  // Проверка статуса оплаты на сервере
+  async function checkPaymentStatus(teamName) {
     try {
-      const url = `${API_ENDPOINTS.checkPayment}/${encodeURIComponent(teamName)}`;
-      console.log(`🔍 Проверка оплаты для команды: ${teamName}`);
-      console.log(`📡 URL: ${url}`);
-
-      const response = await fetch(url);
+      const response = await fetch(`${BACKEND_API_URL}/api/check-payment/${encodeURIComponent(teamName)}`);
       const data = await response.json();
-
-      console.log('📥 Ответ от сервера:', data);
-
-      return data;
+      return data.paid === true;
     } catch (error) {
-      console.error('❌ Ошибка проверки оплаты:', error);
-      return { success: false, error: error.message };
+      console.error('Ошибка проверки оплаты:', error);
+      return false;
     }
   }
 
-  /**
-   * Проверка статуса оплаты по order_id
-   */
-  async function checkPaymentByOrderId(orderId) {
-    try {
-      const url = `${API_ENDPOINTS.checkOrder}/${orderId}`;
-      console.log(`🔍 Проверка заказа: ${orderId}`);
-      console.log(`📡 URL: ${url}`);
+  // Поиск ссылки на Telegram
+  function findTelegramLink() {
+    // Ищем ссылку с t.me
+    const links = document.querySelectorAll('a[href*="t.me"]');
+    if (links.length > 0) return links[0];
 
-      const response = await fetch(url);
-      const data = await response.json();
+    // Ищем по ID
+    const linkById = document.getElementById('telegram-chat-link');
+    if (linkById) return linkById;
 
-      console.log('📥 Ответ от сервера:', data);
+    return null;
+  }
 
-      return data;
-    } catch (error) {
-      console.error('❌ Ошибка проверки заказа:', error);
-      return { success: false, error: error.message };
+  // Показать ссылку на Telegram
+  function showTelegramLink() {
+    const link = findTelegramLink();
+    if (link) {
+      link.style.display = '';
+      link.style.visibility = 'visible';
+      link.style.opacity = '1';
     }
   }
 
-  /**
-   * Поиск и раскрытие ссылки на Telegram чат
-   */
-  function revealTelegramLink() {
-    console.log('🔍 Поиск ссылки на Telegram чат...');
-
-    // Ищем ссылку на Telegram
-    let telegramLink = document.getElementById('telegram-chat-link');
-
-    if (!telegramLink) {
-      // Ищем по href
-      const links = document.querySelectorAll('a[href*="t.me"]');
-      if (links.length > 0) {
-        telegramLink = links[0];
-      }
-    }
-
-    if (telegramLink) {
-      // Показываем ссылку
-      telegramLink.style.display = '';
-      telegramLink.style.visibility = 'visible';
-      telegramLink.style.opacity = '1';
-      telegramLink.classList.add('telegram-link-revealed');
-
-      console.log('✅ Ссылка на Telegram чат открыта');
-      return true;
-    } else {
-      console.warn('⚠️ Ссылка на Telegram не найдена на странице');
-
-      // Создаем собственную ссылку
-      const container = document.getElementById('payment-success-block');
-      if (container) {
-        const linkElement = document.createElement('a');
-        linkElement.href = TELEGRAM_CHAT_URL;
-        linkElement.target = '_blank';
-        linkElement.style.cssText = `
-          display: inline-block;
-          margin-top: 20px;
-          padding: 15px 30px;
-          background: #0088cc;
-          color: white;
-          text-decoration: none;
-          border-radius: 5px;
-          font-size: 18px;
-          font-weight: bold;
-          transition: all 0.3s ease;
-        `;
-        linkElement.textContent = '📱 Присоединиться к капитанскому чату';
-
-        linkElement.onmouseover = () => linkElement.style.background = '#006699';
-        linkElement.onmouseout = () => linkElement.style.background = '#0088cc';
-
-        container.appendChild(linkElement);
-        console.log('✅ Создана новая ссылка на Telegram');
-      }
-
-      return true;
-    }
-  }
-
-  /**
-   * Скрытие ссылки на Telegram
-   */
+  // Скрыть ссылку на Telegram
   function hideTelegramLink() {
-    console.log('🔒 Скрытие ссылки на Telegram...');
-
-    const telegramLink = document.getElementById('telegram-chat-link') ||
-                         document.querySelector('a[href*="t.me"]');
-
-    if (telegramLink) {
-      telegramLink.style.display = 'none';
-      telegramLink.style.visibility = 'hidden';
-      telegramLink.style.opacity = '0';
+    const link = findTelegramLink();
+    if (link) {
+      link.style.display = 'none';
+      link.style.visibility = 'hidden';
+      link.style.opacity = '0';
     }
   }
 
-  /**
-   * Очистка localStorage
-   */
+  // Очистка localStorage
   function clearStoredData() {
     try {
       localStorage.removeItem('apml_registration_data');
       localStorage.removeItem('apml_payment_order_id');
-      console.log('✅ localStorage очищен');
     } catch (error) {
-      console.error('❌ Ошибка очистки localStorage:', error);
+      console.error('Ошибка очистки localStorage:', error);
     }
   }
 
-  /**
-   * Обработка успешной оплаты
-   */
-  function handlePaymentSuccess(teamName) {
-    console.log('✅ Оплата подтверждена!');
+  // Основная логика
+  async function init() {
+    const registrationData = getStoredData();
 
-    // Показываем блок успеха
-    showBlock('payment-success-block');
-
-    // Отображаем название команды
-    const teamNameEl = document.getElementById('success-team-name');
-    if (teamNameEl && teamName) {
-      teamNameEl.textContent = teamName;
-    }
-
-    // Открываем доступ к Telegram чату
-    revealTelegramLink();
-
-    // Очищаем localStorage
-    clearStoredData();
-  }
-
-  /**
-   * Обработка ожидающей оплаты
-   */
-  function handlePaymentPending() {
-    console.log('⏳ Оплата в ожидании...');
-    showBlock('payment-pending-block');
-    hideTelegramLink();
-  }
-
-  /**
-   * Обработка ошибки/отсутствия оплаты
-   */
-  function handlePaymentError() {
-    console.log('❌ Оплата не найдена');
-    showBlock('payment-error-block');
-    hideTelegramLink();
-  }
-
-  /**
-   * Основная функция проверки оплаты
-   */
-  async function checkPaymentStatus() {
-    console.log('🚀 Начало проверки статуса оплаты...');
-
-    // Проверка конфигурации
-    if (BACKEND_API_URL.includes('YOUR-BACKEND-URL')) {
-      console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: Не настроен URL backend сервера!');
-      handlePaymentError();
+    // Если нет данных, скрываем ссылку
+    if (!registrationData || !registrationData.TeamName) {
+      hideTelegramLink();
       return;
     }
 
-    const { registrationData, orderId } = getStoredData();
+    // Проверяем статус оплаты
+    const isPaid = await checkPaymentStatus(registrationData.TeamName);
 
-    console.log('📦 Данные из localStorage:', {
-      hasRegistrationData: !!registrationData,
-      hasOrderId: !!orderId
-    });
-
-    // Вариант 1: Проверяем по order_id (приоритет)
-    if (orderId) {
-      console.log(`🔍 Проверка по order_id: ${orderId}`);
-
-      const result = await checkPaymentByOrderId(orderId);
-
-      if (result.success && result.paid) {
-        handlePaymentSuccess(result.team_name);
-        return;
-      } else if (result.success && result.payment_status === 'Ожидает оплаты') {
-        handlePaymentPending();
-        return;
-      }
+    if (isPaid) {
+      // Оплата подтверждена - показываем ссылку на Telegram
+      showTelegramLink();
+      // Очищаем localStorage
+      clearStoredData();
+    } else {
+      // Оплата не подтверждена - скрываем ссылку
+      hideTelegramLink();
     }
-
-    // Вариант 2: Проверяем по названию команды
-    if (registrationData && registrationData.TeamName) {
-      console.log(`🔍 Проверка по названию команды: ${registrationData.TeamName}`);
-
-      const result = await checkPaymentByTeamName(registrationData.TeamName);
-
-      if (result.success && result.paid) {
-        handlePaymentSuccess(registrationData.TeamName);
-        return;
-      } else if (result.success && result.payment_status === 'Ожидает оплаты') {
-        handlePaymentPending();
-        return;
-      }
-    }
-
-    // Если ничего не нашли
-    console.warn('⚠️ Не удалось найти информацию об оплате');
-    handlePaymentError();
   }
 
-  /**
-   * Инициализация страницы
-   */
-  function init() {
-    console.log('🚀 Инициализация страницы успеха...');
-
-    // Скрываем ссылку на Telegram по умолчанию
-    hideTelegramLink();
-
-    // Показываем индикатор проверки
-    showBlock('checking-payment-block');
-
-    // Запускаем проверку оплаты через небольшую задержку
-    setTimeout(() => {
-      checkPaymentStatus();
-    }, 1000);
-
-    console.log('✅ Страница успеха инициализирована');
-  }
-
-  // Запускаем инициализацию после загрузки DOM
+  // Запуск после загрузки страницы
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
 
-  // Альтернативный вариант для jQuery
-  $(document).ready(function() {
-    console.log('✅ jQuery ready - обработчик успеха активен');
-  });
-
 })();
 </script>
-
-<!--
-==============================================================
-КОНЕЦ КОДА ДЛЯ СТРАНИЦЫ УСПЕХА
-==============================================================
-
-ВАЖНО ПЕРЕД ИСПОЛЬЗОВАНИЕМ:
-1. Найдите строку: const BACKEND_API_URL = 'https://YOUR-BACKEND-URL.com';
-2. Замените YOUR-BACKEND-URL.com на URL вашего backend сервера
-
-НАСТРОЙКА ССЫЛКИ НА TELEGRAM:
-На странице Tilda создайте ссылку на Telegram чат и:
-1. Вариант А: Добавьте ID "telegram-chat-link" к элементу ссылки
-2. Вариант Б: Просто используйте href с "t.me" - скрипт найдет автоматически
-3. Установите style="display:none" для ссылки по умолчанию
-
-Пример HTML ссылки в Tilda:
-<a id="telegram-chat-link"
-   href="https://t.me/+StEnmHkKvGdlNmUy"
-   style="display:none"
-   target="_blank">
-  Присоединиться к капитанскому чату
-</a>
-
-ТЕСТИРОВАНИЕ:
-1. Откройте консоль браузера (F12)
-2. Страница должна автоматически проверить статус оплаты
-3. При успешной оплате:
-   - Показывается зеленый блок "Оплата успешно завершена"
-   - Появляется ссылка на Telegram чат
-   - localStorage очищается
-4. При ожидании оплаты:
-   - Показывается оранжевый блок с кнопкой "Обновить статус"
-   - Ссылка на Telegram скрыта
-5. При ошибке:
-   - Показывается красный блок с вариантами действий
-   - Ссылка на Telegram скрыта
-
-ОТЛАДКА:
-В консоли браузера выполните:
-  localStorage.getItem('apml_payment_order_id')
-  localStorage.getItem('apml_registration_data')
-
-Чтобы проверить наличие данных
-
-ВОЗМОЖНЫЕ ПРОБЛЕМЫ:
-- Если не находит ссылку на Telegram:
-  * Проверьте что ссылка есть на странице
-  * Проверьте ID или href ссылки
-  * Скрипт создаст свою ссылку автоматически
-
-- Если не проверяется оплата:
-  * Проверьте URL backend сервера
-  * Проверьте Network tab в DevTools
-  * Убедитесь что сервер доступен
-
-- Если всегда показывается ошибка:
-  * Проверьте что прошли через полный flow:
-    регистрация → оплата → успех
-  * Проверьте localStorage
-  * Проверьте что backend возвращает корректные данные
-==============================================================
--->

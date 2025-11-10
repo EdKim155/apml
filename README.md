@@ -244,7 +244,7 @@ curl -X POST http://localhost:3000/api/create-payment \
 - [ ] Service Account создан
 - [ ] credentials.json скачан
 - [ ] Service Account добавлен в Google Sheets
-- [ ] Столбцы X, Y, Z, AA добавлены в таблицу
+- [ ] Столбец Y добавлен в таблицу (payment_status)
 
 ### ЮKassa
 - [ ] Аккаунт зарегистрирован

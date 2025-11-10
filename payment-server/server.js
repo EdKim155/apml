@@ -63,7 +63,7 @@ async function authorizeSheets() {
 }
 
 /**
- * Обновление статуса оплаты в Google Sheets (упрощенная версия - только столбец X)
+ * Обновление статуса оплаты в Google Sheets (упрощенная версия - только столбец Y)
  * @param {string} teamName - Название команды
  * @param {string} paymentStatus - Статус оплаты
  */
@@ -74,7 +74,7 @@ async function updatePaymentStatus(teamName, paymentStatus) {
     // Получаем все данные из таблицы
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_NAME}!A:X`,
+      range: `${SHEET_NAME}!A:Y`,
     });
 
     const rows = response.data.values;
@@ -98,10 +98,10 @@ async function updatePaymentStatus(teamName, paymentStatus) {
       throw new Error(`Команда "${teamName}" не найдена в таблице`);
     }
 
-    // Обновляем столбец X (payment_status) - индекс 23
+    // Обновляем столбец Y (payment_status) - индекс 24
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_NAME}!X${targetRowIndex + 1}`,
+      range: `${SHEET_NAME}!Y${targetRowIndex + 1}`,
       valueInputOption: 'RAW',
       resource: {
         values: [[paymentStatus]]
@@ -128,7 +128,7 @@ async function getPaymentStatus(teamName) {
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_NAME}!A:X`,
+      range: `${SHEET_NAME}!A:Y`,
     });
 
     const rows = response.data.values;
@@ -142,7 +142,7 @@ async function getPaymentStatus(teamName) {
       const rowTeamName = row[1]; // Столбец B
 
       if (rowTeamName && rowTeamName.toLowerCase().trim() === teamName.toLowerCase().trim()) {
-        const paymentStatus = row[23]; // Столбец X
+        const paymentStatus = row[24]; // Столбец Y
 
         return {
           paid: paymentStatus === 'Оплачено',

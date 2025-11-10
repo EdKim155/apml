@@ -8,7 +8,7 @@
 
 1. Откройте таблицу: https://docs.google.com/spreadsheets/d/1xrEdEvfmxNlP-86PJJVn8QqeOXQbCvusguA_SHipwvI/edit
 
-2. Добавьте **столбец X** с заголовком `payment_status` после существующих столбцов
+2. Добавьте **столбец Y** с заголовком `payment_status` после существующих столбцов
 
 3. Все данные команды (название, игроки, Telegram) уже заполняются формой Tilda автоматически
 
@@ -162,13 +162,13 @@ Response:
    ↓
 5. Backend создает платеж в CodeePay
    ↓
-6. Backend обновляет Google Sheets: столбец X = "Ожидает оплаты"
+6. Backend обновляет Google Sheets: столбец Y = "Ожидает оплаты"
    ↓
 7. Пользователь оплачивает через CodeePay
    ↓
 8. CodeePay отправляет webhook на backend
    ↓
-9. Backend обновляет Google Sheets: столбец X = "Оплачено"
+9. Backend обновляет Google Sheets: столбец Y = "Оплачено"
    ↓
 10. Пользователь возвращается на страницу успеха
    ↓
@@ -206,9 +206,9 @@ curl -X POST https://ucnominal.ru/api/create-payment \
 
 ### 9. Структура Google Sheets
 
-**ВАЖНО:** Нужен только столбец X!
+**ВАЖНО:** Нужен только столбец Y!
 
-| A | B | C | ... | W | **X** |
+| A | B | C | ... | X | **Y** |
 |---|---|---|-----|---|-------|
 | Group_qual | TeamName | Captain | ... | Player5_ID | **payment_status** |
 | Группа А | Test Team | @captain | ... | 123456 | **Оплачено** |
@@ -245,13 +245,13 @@ pm2 save
 - Публично доступный HTTPS endpoint
 - Firewall разрешает 83.222.9.37 (webhook IP)
 - credentials.json на сервере
-- Столбец X добавлен в Google Sheets
+- Столбец Y добавлен в Google Sheets
 
 ❌ **Частые ошибки:**
 - Webhook URL не публично доступен
 - Неверный API ключ CodeePay
 - Service Account нет в Google Sheets
-- Столбец X не добавлен или неправильное название
+- Столбец Y не добавлен или неправильное название
 
 ### 12. Логи и отладка
 

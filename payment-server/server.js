@@ -3,7 +3,7 @@
  * Сервер для обработки платежей турнира Squad Masters
  *
  * Основной функционал:
- * - Создание платежей через ЮKassa API
+ * - Создание платежей через CodeePay API
  * - Обработка webhook уведомлений от платежной системы
  * - Синхронизация статусов с Google Sheets
  * - Проверка статусов оплаты команд
@@ -12,7 +12,6 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const crypto = require('crypto');
 const axios = require('axios');
 const { google } = require('googleapis');
 
@@ -26,9 +25,9 @@ const PORT = process.env.PORT || 3000;
 // Middleware для парсинга JSON
 app.use(express.json());
 
-// CORS настройки - разрешаем запросы с Tilda
+// CORS настройки - разрешаем запросы с Tilda и ucnominal.ru
 app.use(cors({
-  origin: ['https://apml.online', 'http://apml.online'],
+  origin: ['https://apml.online', 'http://apml.online', 'https://ucnominal.ru'],
   methods: ['GET', 'POST'],
   credentials: true
 }));
@@ -64,19 +63,18 @@ async function authorizeSheets() {
 }
 
 /**
- * Обновление данных в Google Sheets
+ * Обновление статуса оплаты в Google Sheets (упрощенная версия - только столбец X)
  * @param {string} teamName - Название команды
- * @param {number} registrationTimestamp - Timestamp регистрации
- * @param {Object} updates - Объект с обновлениями { payment_status, payment_order_id, payment_timestamp }
+ * @param {string} paymentStatus - Статус оплаты
  */
-async function updateGoogleSheet(teamName, registrationTimestamp, updates) {
+async function updatePaymentStatus(teamName, paymentStatus) {
   try {
     const sheets = await authorizeSheets();
 
     // Получаем все данные из таблицы
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_NAME}!A:AA`,
+      range: `${SHEET_NAME}!A:X`,
     });
 
     const rows = response.data.values;
@@ -84,22 +82,13 @@ async function updateGoogleSheet(teamName, registrationTimestamp, updates) {
       throw new Error('Таблица пуста');
     }
 
-    // Ищем строку с нужной командой
+    // Ищем строку с нужной командой (столбец B = TeamName)
     let targetRowIndex = -1;
     for (let i = 1; i < rows.length; i++) { // Начинаем с 1, пропускаем заголовок
       const row = rows[i];
       const rowTeamName = row[1]; // Столбец B (TeamName)
-      const rowTimestamp = row[26]; // Столбец AA (registration_timestamp)
 
-      // Сравниваем название команды
-      if (rowTeamName && rowTeamName.toLowerCase() === teamName.toLowerCase()) {
-        // Если есть timestamp регистрации, проверяем его (в пределах ±2 минут)
-        if (registrationTimestamp && rowTimestamp) {
-          const timeDiff = Math.abs(Number(rowTimestamp) - registrationTimestamp);
-          if (timeDiff > 120000) { // 2 минуты в миллисекундах
-            continue; // Пропускаем, если время не совпадает
-          }
-        }
+      if (rowTeamName && rowTeamName.toLowerCase().trim() === teamName.toLowerCase().trim()) {
         targetRowIndex = i;
         break;
       }
@@ -109,53 +98,17 @@ async function updateGoogleSheet(teamName, registrationTimestamp, updates) {
       throw new Error(`Команда "${teamName}" не найдена в таблице`);
     }
 
-    // Формируем обновления
-    const updateRequests = [];
+    // Обновляем столбец X (payment_status) - индекс 23
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SHEET_NAME}!X${targetRowIndex + 1}`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [[paymentStatus]]
+      }
+    });
 
-    // Столбец X (payment_status) - индекс 23
-    if (updates.payment_status) {
-      updateRequests.push({
-        range: `${SHEET_NAME}!X${targetRowIndex + 1}`,
-        values: [[updates.payment_status]]
-      });
-    }
-
-    // Столбец Y (payment_order_id) - индекс 24
-    if (updates.payment_order_id) {
-      updateRequests.push({
-        range: `${SHEET_NAME}!Y${targetRowIndex + 1}`,
-        values: [[updates.payment_order_id]]
-      });
-    }
-
-    // Столбец Z (payment_timestamp) - индекс 25
-    if (updates.payment_timestamp) {
-      updateRequests.push({
-        range: `${SHEET_NAME}!Z${targetRowIndex + 1}`,
-        values: [[updates.payment_timestamp]]
-      });
-    }
-
-    // Столбец AA (registration_timestamp) - индекс 26
-    if (updates.registration_timestamp) {
-      updateRequests.push({
-        range: `${SHEET_NAME}!AA${targetRowIndex + 1}`,
-        values: [[updates.registration_timestamp.toString()]]
-      });
-    }
-
-    // Выполняем batch update
-    if (updateRequests.length > 0) {
-      await sheets.spreadsheets.values.batchUpdate({
-        spreadsheetId: SPREADSHEET_ID,
-        resource: {
-          valueInputOption: 'RAW',
-          data: updateRequests
-        }
-      });
-
-      console.log(`✅ Обновлена строка ${targetRowIndex + 1} для команды "${teamName}"`);
-    }
+    console.log(`✅ Обновлена строка ${targetRowIndex + 1} для команды "${teamName}" - статус: ${paymentStatus}`);
 
     return { success: true, rowIndex: targetRowIndex + 1 };
   } catch (error) {
@@ -167,7 +120,7 @@ async function updateGoogleSheet(teamName, registrationTimestamp, updates) {
 /**
  * Получение статуса оплаты команды из Google Sheets
  * @param {string} teamName - Название команды
- * @returns {Promise<Object>} - { paid: boolean, order_id: string, paid_at: string }
+ * @returns {Promise<Object>} - { paid: boolean, payment_status: string }
  */
 async function getPaymentStatus(teamName) {
   try {
@@ -175,7 +128,7 @@ async function getPaymentStatus(teamName) {
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_NAME}!A:AA`,
+      range: `${SHEET_NAME}!A:X`,
     });
 
     const rows = response.data.values;
@@ -188,21 +141,17 @@ async function getPaymentStatus(teamName) {
       const row = rows[i];
       const rowTeamName = row[1]; // Столбец B
 
-      if (rowTeamName && rowTeamName.toLowerCase() === teamName.toLowerCase()) {
+      if (rowTeamName && rowTeamName.toLowerCase().trim() === teamName.toLowerCase().trim()) {
         const paymentStatus = row[23]; // Столбец X
-        const orderId = row[24]; // Столбец Y
-        const paidAt = row[25]; // Столбец Z
 
         return {
           paid: paymentStatus === 'Оплачено',
-          payment_status: paymentStatus,
-          order_id: orderId,
-          paid_at: paidAt
+          payment_status: paymentStatus || 'Не оплачено'
         };
       }
     }
 
-    return { paid: false };
+    return { paid: false, payment_status: 'Команда не найдена' };
   } catch (error) {
     console.error('Ошибка получения статуса оплаты:', error.message);
     throw error;
@@ -210,99 +159,85 @@ async function getPaymentStatus(teamName) {
 }
 
 // ============================================
-// YOOKASSA API ИНТЕГРАЦИЯ
+// CODEEPAY API ИНТЕГРАЦИЯ
 // ============================================
 
+const CODEEPAY_API_URL = process.env.CODEEPAY_API_URL || 'https://api.codeepay.com';
+const CODEEPAY_API_KEY = process.env.CODEEPAY_API_KEY;
+
 /**
- * Создание платежа в ЮKassa
+ * Создание платежа в CodeePay
  * @param {Object} orderData - Данные заказа
- * @returns {Promise<Object>} - { payment_url, payment_id }
+ * @returns {Promise<Object>} - { payment_url, order_id, qr_url }
  */
-async function createYookassaPayment(orderData) {
+async function createCodeePayPayment(orderData) {
   try {
-    const auth = Buffer.from(
-      `${process.env.YOOKASSA_SHOP_ID}:${process.env.YOOKASSA_API_KEY}`
-    ).toString('base64');
-
-    const paymentData = {
-      amount: {
-        value: orderData.amount.toFixed(2),
-        currency: orderData.currency || 'RUB'
-      },
-      capture: true,
-      confirmation: {
-        type: 'redirect',
-        return_url: orderData.success_url
-      },
-      description: orderData.description,
-      metadata: {
-        team_name: orderData.team_name,
-        captain_telegram: orderData.captain_telegram,
-        group: orderData.group,
-        registration_timestamp: orderData.registration_timestamp,
-        order_id: orderData.order_id
-      }
-    };
-
-    // Если нужен чек (для 54-ФЗ)
-    if (process.env.YOOKASSA_SEND_RECEIPT === 'true') {
-      paymentData.receipt = {
-        customer: {
-          email: orderData.customer_email || 'noreply@apml.online'
-        },
-        items: [{
-          description: orderData.description,
-          quantity: '1.00',
-          amount: {
-            value: orderData.amount.toFixed(2),
-            currency: 'RUB'
-          },
-          vat_code: 1, // НДС не облагается
-          payment_mode: 'full_payment',
-          payment_subject: 'service'
-        }]
-      };
-    }
-
-    console.log('Создание платежа ЮKassa:', paymentData);
+    console.log('📤 Создание платежа CodeePay:', {
+      order_id: orderData.order_id,
+      amount: orderData.amount,
+      method: orderData.method
+    });
 
     const response = await axios.post(
-      'https://api.yookassa.ru/v3/payments',
-      paymentData,
+      `${CODEEPAY_API_URL}/initiate_payment`,
+      {
+        order_id: orderData.order_id,
+        amount: orderData.amount,
+        method: orderData.method, // 'sbp' или 'card'
+        metadata: {
+          team_name: orderData.team_name,
+          captain_telegram: orderData.captain_telegram,
+          group: orderData.group,
+          notification_url: `${process.env.BACKEND_URL}/api/payment-callback`
+        }
+      },
       {
         headers: {
-          'Authorization': `Basic ${auth}`,
-          'Idempotence-Key': orderData.order_id, // Защита от дублирования
+          'X-Api-Key': CODEEPAY_API_KEY,
           'Content-Type': 'application/json'
         }
       }
     );
 
-    console.log('✅ Платеж создан:', response.data.id);
+    console.log('✅ Платеж CodeePay создан:', response.data);
 
     return {
-      payment_url: response.data.confirmation.confirmation_url,
-      payment_id: response.data.id,
-      status: response.data.status
+      payment_url: response.data.payment_url,
+      order_id: response.data.order_id,
+      qr_url: response.data.qr_url || null,
+      method: response.data.method
     };
   } catch (error) {
-    console.error('Ошибка создания платежа ЮKassa:', error.response?.data || error.message);
-    throw new Error(error.response?.data?.description || 'Ошибка создания платежа');
+    console.error('❌ Ошибка создания платежа CodeePay:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.detail || 'Ошибка создания платежа');
   }
 }
 
 /**
- * Проверка подписи webhook от ЮKassa
- * @param {Object} notification - Объект уведомления
- * @returns {boolean}
+ * Проверка статуса платежа в CodeePay
+ * @param {string} orderId - ID заказа
+ * @returns {Promise<Object>}
  */
-function verifyYookassaSignature(notification) {
-  // ЮKassa не использует HMAC подпись для webhook
-  // Вместо этого рекомендуется проверять IP адрес отправителя
-  // Список IP: https://yookassa.ru/developers/using-api/webhooks#ip
+async function checkCodeePayPayment(orderId) {
+  try {
+    const response = await axios.post(
+      `${CODEEPAY_API_URL}/get_payment`,
+      {
+        order_id: orderId
+      },
+      {
+        headers: {
+          'X-Api-Key': CODEEPAY_API_KEY,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
 
-  // Для дополнительной безопасности можно добавить секретный токен в URL
-  return true; // В продакшене добавьте реальную проверку
+    return response.data;
+  } catch (error) {
+    console.error('❌ Ошибка проверки платежа:', error.response?.data || error.message);
+    throw error;
+  }
 }
 
 // ============================================
@@ -316,14 +251,14 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    service: 'APML Payment Server'
+    service: 'APML Payment Server (CodeePay)'
   });
 });
 
 /**
  * Создание платежа
  * POST /api/create-payment
- * Body: { team_name, captain_telegram, group, amount, description, success_url, registration_timestamp }
+ * Body: { team_name, captain_telegram, group, amount, method }
  */
 app.post('/api/create-payment', async (req, res) => {
   try {
@@ -332,16 +267,14 @@ app.post('/api/create-payment', async (req, res) => {
       captain_telegram,
       group,
       amount,
-      description,
-      success_url,
-      registration_timestamp
+      method = 'sbp' // По умолчанию СБП
     } = req.body;
 
     // Валидация обязательных полей
-    if (!team_name || !captain_telegram || !amount || !success_url) {
+    if (!team_name || !captain_telegram || !amount) {
       return res.status(400).json({
         success: false,
-        error: 'Отсутствуют обязательные поля'
+        error: 'Отсутствуют обязательные поля: team_name, captain_telegram, amount'
       });
     }
 
@@ -360,27 +293,20 @@ app.post('/api/create-payment', async (req, res) => {
     // Генерируем уникальный order_id
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const order_id = `APML_GROUPA_${timestamp}_${random}`;
+    const order_id = `APML_${timestamp}_${random}`;
 
-    // Создаем платеж в ЮKassa
-    const payment = await createYookassaPayment({
+    // Создаем платеж в CodeePay
+    const payment = await createCodeePayPayment({
       order_id,
       team_name,
       captain_telegram,
       group,
       amount,
-      currency: 'RUB',
-      description: description || `Оплата участия в турнире Squad Masters - ${team_name} - Группа А`,
-      success_url,
-      registration_timestamp
+      method
     });
 
     // Обновляем статус в Google Sheets
-    await updateGoogleSheet(team_name, registration_timestamp, {
-      payment_status: 'Ожидает оплаты',
-      payment_order_id: order_id,
-      registration_timestamp: registration_timestamp || timestamp
-    });
+    await updatePaymentStatus(team_name, 'Ожидает оплаты');
 
     console.log(`✅ Платеж создан для команды ${team_name}, order_id: ${order_id}`);
 
@@ -389,7 +315,8 @@ app.post('/api/create-payment', async (req, res) => {
       success: true,
       payment_url: payment.payment_url,
       payment_order_id: order_id,
-      payment_id: payment.payment_id
+      qr_url: payment.qr_url,
+      method: payment.method
     });
 
   } catch (error) {
@@ -402,66 +329,76 @@ app.post('/api/create-payment', async (req, res) => {
 });
 
 /**
- * Webhook для обработки уведомлений от ЮKassa
+ * Webhook для обработки уведомлений от CodeePay
  * POST /api/payment-callback
+ *
+ * Формат webhook:
+ * {
+ *   "order_id": "ABC123",
+ *   "amount": 100,
+ *   "final_amount": 95,
+ *   "commission_amount": 5,
+ *   "method": "card",
+ *   "metadata": {
+ *     "team_name": "...",
+ *     "captain_telegram": "...",
+ *     "notification_url": "https://..."
+ *   }
+ * }
  */
 app.post('/api/payment-callback', async (req, res) => {
   try {
-    console.log('\n🔔 Получен webhook от ЮKassa');
+    console.log('\n🔔 Получен webhook от CodeePay');
     console.log('Body:', JSON.stringify(req.body, null, 2));
 
-    const notification = req.body;
+    // Проверка IP адреса (опционально, но рекомендуется)
+    const clientIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    console.log(`📍 IP отправителя: ${clientIp}`);
 
-    // Проверка подписи (в продакшене обязательно!)
-    // if (!verifyYookassaSignature(notification)) {
-    //   console.error('❌ Неверная подпись webhook');
-    //   return res.status(403).json({ error: 'Invalid signature' });
+    // ВАЖНО: В продакшене раскомментируйте проверку IP
+    // const ALLOWED_IP = '83.222.9.37';
+    // if (!clientIp.includes(ALLOWED_IP)) {
+    //   console.error('❌ Неразрешенный IP адрес');
+    //   return res.status(403).json({ error: 'Forbidden' });
     // }
 
-    // Извлекаем данные платежа
-    const paymentObject = notification.object;
-    const paymentStatus = paymentObject.status;
-    const metadata = paymentObject.metadata || {};
-    const orderId = metadata.order_id;
+    const webhook = req.body;
+    const orderId = webhook.order_id;
+    const metadata = webhook.metadata || {};
     const teamName = metadata.team_name;
-    const registrationTimestamp = Number(metadata.registration_timestamp);
 
-    console.log(`Статус платежа: ${paymentStatus}, Order ID: ${orderId}, Команда: ${teamName}`);
-
-    // Обрабатываем успешную оплату
-    if (paymentStatus === 'succeeded') {
-      console.log('✅ Платеж успешно проведен');
-
-      // Обновляем статус в Google Sheets
-      await updateGoogleSheet(teamName, registrationTimestamp, {
-        payment_status: 'Оплачено',
-        payment_timestamp: new Date().toISOString()
-      });
-
-      console.log(`✅ Статус команды "${teamName}" обновлен на "Оплачено"`);
-
-      // Опционально: отправка уведомления в Telegram
-      if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
-        await sendTelegramNotification(
-          `✅ Новая оплата!\n\nКоманда: ${teamName}\nСумма: ${paymentObject.amount.value} ${paymentObject.amount.currency}\nOrder ID: ${orderId}`
-        );
-      }
-    } else if (paymentStatus === 'canceled') {
-      console.log('❌ Платеж отменен');
-
-      // Можно обновить статус на "Отменено"
-      await updateGoogleSheet(teamName, registrationTimestamp, {
-        payment_status: 'Отменено'
-      });
+    if (!teamName) {
+      console.error('❌ Отсутствует team_name в metadata');
+      return res.status(400).json({ error: 'Missing team_name in metadata' });
     }
 
-    // Важно: возвращаем 200 OK, чтобы ЮKassa не повторяла webhook
-    res.json({ success: true });
+    console.log(`💰 Платеж для команды: ${teamName}`);
+    console.log(`💵 Сумма: ${webhook.amount}, Получено: ${webhook.final_amount}, Комиссия: ${webhook.commission_amount}`);
+    console.log(`💳 Метод: ${webhook.method}`);
+
+    // Обновляем статус в Google Sheets на "Оплачено"
+    await updatePaymentStatus(teamName, 'Оплачено');
+
+    console.log(`✅ Статус команды "${teamName}" обновлен на "Оплачено"`);
+
+    // Опционально: отправка уведомления в Telegram
+    if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
+      await sendTelegramNotification(
+        `✅ Новая оплата!\n\n` +
+        `Команда: ${teamName}\n` +
+        `Сумма: ${webhook.final_amount} ₽\n` +
+        `Метод: ${webhook.method}\n` +
+        `Order ID: ${orderId}`
+      );
+    }
+
+    // ВАЖНО: Возвращаем 200 OK для подтверждения получения webhook
+    res.status(200).json({ success: true });
 
   } catch (error) {
     console.error('❌ Ошибка обработки webhook:', error.message);
-    // Все равно возвращаем 200, чтобы не было повторных попыток
-    res.json({ success: false, error: error.message });
+    // Все равно возвращаем 200, чтобы избежать повторных попыток
+    res.status(200).json({ success: false, error: error.message });
   }
 });
 
@@ -478,6 +415,7 @@ app.get('/api/check-payment/:teamName', async (req, res) => {
 
     res.json({
       success: true,
+      team_name: teamName,
       ...status
     });
 
@@ -491,46 +429,21 @@ app.get('/api/check-payment/:teamName', async (req, res) => {
 });
 
 /**
- * Проверка статуса оплаты по order_id
+ * Проверка статуса платежа по order_id в CodeePay
  * GET /api/check-order/:orderId
  */
 app.get('/api/check-order/:orderId', async (req, res) => {
   try {
     const orderId = req.params.orderId;
-    console.log(`\n🔍 Проверка статуса заказа: ${orderId}`);
+    console.log(`\n🔍 Проверка статуса заказа в CodeePay: ${orderId}`);
 
-    const sheets = await authorizeSheets();
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_NAME}!A:AA`,
+    const payment = await checkCodeePayPayment(orderId);
+
+    res.json({
+      success: true,
+      order_id: orderId,
+      ...payment
     });
-
-    const rows = response.data.values;
-    if (!rows || rows.length === 0) {
-      return res.json({ success: false, error: 'Таблица пуста' });
-    }
-
-    // Ищем заказ
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i];
-      const rowOrderId = row[24]; // Столбец Y
-
-      if (rowOrderId === orderId) {
-        const teamName = row[1]; // Столбец B
-        const paymentStatus = row[23]; // Столбец X
-        const paidAt = row[25]; // Столбец Z
-
-        return res.json({
-          success: true,
-          team_name: teamName,
-          paid: paymentStatus === 'Оплачено',
-          payment_status: paymentStatus,
-          paid_at: paidAt
-        });
-      }
-    }
-
-    res.json({ success: false, error: 'Заказ не найден' });
 
   } catch (error) {
     console.error('❌ Ошибка проверки заказа:', error.message);
@@ -576,19 +489,20 @@ async function sendTelegramNotification(message) {
 
 app.listen(PORT, () => {
   console.log('\n' + '='.repeat(50));
-  console.log('🚀 APML Payment Server запущен');
+  console.log('🚀 APML Payment Server запущен (CodeePay)');
   console.log('='.repeat(50));
   console.log(`📡 Порт: ${PORT}`);
   console.log(`🌍 Окружение: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📊 Google Sheets ID: ${SPREADSHEET_ID}`);
   console.log(`📄 Лист: ${SHEET_NAME}`);
+  console.log(`💳 CodeePay API: ${CODEEPAY_API_URL}`);
   console.log('='.repeat(50) + '\n');
 
   // Проверка переменных окружения
   const requiredEnvVars = [
     'GOOGLE_SPREADSHEET_ID',
-    'YOOKASSA_SHOP_ID',
-    'YOOKASSA_API_KEY'
+    'CODEEPAY_API_KEY',
+    'BACKEND_URL'
   ];
 
   const missingVars = requiredEnvVars.filter(v => !process.env[v]);

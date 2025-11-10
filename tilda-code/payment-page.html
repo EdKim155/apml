@@ -1,0 +1,459 @@
+<!--
+==============================================================
+КОД ДЛЯ СТРАНИЦЫ ОПЛАТЫ (ZERO BLOCK)
+==============================================================
+Страница: https://apml.online/groupa-payments-squad-masters-21nov
+
+ИНСТРУКЦИЯ ПО УСТАНОВКЕ:
+1. Откройте страницу оплаты в редакторе Tilda
+2. Добавьте блок "T123: Zero Block"
+3. Скопируйте весь код ниже в HTML-редактор Zero Block
+4. ВАЖНО: Замените YOUR-BACKEND-URL на ваш реальный URL backend сервера
+5. Сохраните и опубликуйте страницу
+
+ВАЖНО: Найдите в коде строку с BACKEND_API_URL и замените на ваш URL!
+==============================================================
+-->
+
+<!-- HTML блоки для отображения информации -->
+<div id="apml-payment-container" style="max-width: 600px; margin: 40px auto; padding: 20px;">
+
+  <!-- Блок с информацией о команде -->
+  <div id="team-info-block" style="display: none; background: #f5f5f5; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+    <h3 style="margin-top: 0;">Информация о регистрации</h3>
+    <p><strong>Название команды:</strong> <span id="team-name-display">-</span></p>
+    <p><strong>Telegram капитана:</strong> <span id="captain-telegram-display">-</span></p>
+    <p><strong>Группа:</strong> <span id="group-display">-</span></p>
+    <hr>
+    <p style="font-size: 24px; font-weight: bold; margin: 15px 0;">
+      Сумма к оплате: <span style="color: #4CAF50;">5 000 ₽</span>
+    </p>
+  </div>
+
+  <!-- Блок ошибки (если нет данных регистрации) -->
+  <div id="error-no-data-block" style="display: none; background: #ffebee; padding: 20px; border-radius: 10px; border-left: 4px solid #f44336;">
+    <h3 style="color: #c62828; margin-top: 0;">Ошибка: Данные регистрации не найдены</h3>
+    <p>Для оплаты участия сначала необходимо пройти регистрацию.</p>
+    <p>
+      <a href="https://apml.online/squad-masters-reg-21nov2025-group-a"
+         style="display: inline-block; background: #2196F3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin-top: 10px;">
+        Перейти к регистрации
+      </a>
+    </p>
+  </div>
+
+  <!-- Блок уже оплачено -->
+  <div id="already-paid-block" style="display: none; background: #e8f5e9; padding: 20px; border-radius: 10px; border-left: 4px solid #4CAF50;">
+    <h3 style="color: #2e7d32; margin-top: 0;">Оплата уже произведена</h3>
+    <p>Ваша команда уже оплатила участие в турнире.</p>
+    <p>
+      <a href="https://apml.online/groupa-reg-squad-masters-success-21nov"
+         style="display: inline-block; background: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin-top: 10px;">
+        Перейти к странице успеха
+      </a>
+    </p>
+  </div>
+
+  <!-- Индикатор загрузки -->
+  <div id="loading-indicator" style="display: none; text-align: center; padding: 20px;">
+    <div style="display: inline-block; width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+    <p style="margin-top: 15px; color: #666;">Обработка платежа...</p>
+  </div>
+
+</div>
+
+<style>
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Стили для кнопки оплаты Tilda */
+#apml-payment-button {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+#apml-payment-button:hover {
+  transform: scale(1.05);
+}
+
+#apml-payment-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+</style>
+
+<script>
+/**
+ * APML Squad Masters - Обработчик страницы оплаты
+ *
+ * Этот скрипт выполняет следующие действия:
+ * 1. Проверяет наличие данных регистрации в localStorage
+ * 2. Отображает информацию о команде
+ * 3. Находит и перехватывает кнопку оплаты Tilda
+ * 4. Создает платеж через backend API
+ * 5. Перенаправляет на страницу оплаты ЮKassa
+ */
+
+(function() {
+  'use strict';
+
+  // ============================================
+  // КОНФИГУРАЦИЯ
+  // ============================================
+
+  // ВАЖНО: Замените на URL вашего backend сервера!
+  const BACKEND_API_URL = 'https://YOUR-BACKEND-URL.com';
+
+  const API_ENDPOINTS = {
+    createPayment: `${BACKEND_API_URL}/api/create-payment`,
+    checkPayment: `${BACKEND_API_URL}/api/check-payment`
+  };
+
+  const SUCCESS_PAGE_URL = 'https://apml.online/groupa-reg-squad-masters-success-21nov';
+  const REGISTRATION_PAGE_URL = 'https://apml.online/squad-masters-reg-21nov2025-group-a';
+
+  const PAYMENT_AMOUNT = 5000; // Сумма в рублях
+
+  // ============================================
+  // ОСНОВНЫЕ ФУНКЦИИ
+  // ============================================
+
+  /**
+   * Получение данных регистрации из localStorage
+   * @returns {Object|null}
+   */
+  function getRegistrationData() {
+    try {
+      const data = localStorage.getItem('apml_registration_data');
+      if (!data) {
+        console.warn('⚠️ Данные регистрации не найдены в localStorage');
+        return null;
+      }
+      const parsed = JSON.parse(data);
+      console.log('✅ Данные регистрации загружены:', parsed);
+      return parsed;
+    } catch (error) {
+      console.error('❌ Ошибка чтения localStorage:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Отображение информации о команде
+   * @param {Object} data - Данные регистрации
+   */
+  function displayTeamInfo(data) {
+    document.getElementById('team-name-display').textContent = data.TeamName || '-';
+    document.getElementById('captain-telegram-display').textContent = data.nickname_Telegram_captain || '-';
+    document.getElementById('group-display').textContent = data.Group_qual || 'Группа А: 21 ноября 18.00 мск';
+
+    document.getElementById('team-info-block').style.display = 'block';
+    console.log('✅ Информация о команде отображена');
+  }
+
+  /**
+   * Показ блока ошибки (нет данных)
+   */
+  function showErrorNoData() {
+    document.getElementById('error-no-data-block').style.display = 'block';
+    console.error('❌ Показан блок ошибки: нет данных регистрации');
+  }
+
+  /**
+   * Показ блока "уже оплачено"
+   */
+  function showAlreadyPaid() {
+    document.getElementById('already-paid-block').style.display = 'block';
+    console.log('✅ Показан блок: оплата уже произведена');
+  }
+
+  /**
+   * Показ индикатора загрузки
+   * @param {boolean} show - Показать или скрыть
+   */
+  function showLoading(show) {
+    document.getElementById('loading-indicator').style.display = show ? 'block' : 'none';
+  }
+
+  /**
+   * Создание платежа через backend API
+   * @param {Object} registrationData - Данные регистрации
+   * @returns {Promise<Object>}
+   */
+  async function createPayment(registrationData) {
+    const requestData = {
+      team_name: registrationData.TeamName,
+      captain_telegram: registrationData.nickname_Telegram_captain,
+      group: registrationData.Group_qual || 'Группа А: 21 ноября 18.00 мск',
+      amount: PAYMENT_AMOUNT,
+      currency: 'RUB',
+      description: `Оплата участия в турнире Squad Masters - ${registrationData.TeamName} - Группа А`,
+      success_url: SUCCESS_PAGE_URL,
+      registration_timestamp: registrationData.registration_timestamp
+    };
+
+    console.log('📤 Отправка запроса на создание платежа:', requestData);
+
+    try {
+      const response = await fetch(API_ENDPOINTS.createPayment, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Ошибка создания платежа');
+      }
+
+      console.log('✅ Платеж создан:', data);
+      return data;
+
+    } catch (error) {
+      console.error('❌ Ошибка создания платежа:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Обработчик клика по кнопке оплаты
+   */
+  async function handlePaymentButtonClick(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    console.log('🔘 Нажата кнопка оплаты');
+
+    // Получаем данные регистрации
+    const registrationData = getRegistrationData();
+    if (!registrationData) {
+      alert('Ошибка: данные регистрации не найдены. Пожалуйста, пройдите регистрацию заново.');
+      window.location.href = REGISTRATION_PAGE_URL;
+      return;
+    }
+
+    // Находим кнопку
+    const button = event.currentTarget;
+
+    // Блокируем кнопку
+    button.disabled = true;
+    const originalText = button.textContent;
+    button.textContent = 'Обработка...';
+
+    // Показываем индикатор загрузки
+    showLoading(true);
+
+    try {
+      // Создаем платеж
+      const paymentResult = await createPayment(registrationData);
+
+      if (paymentResult.already_paid) {
+        showLoading(false);
+        showAlreadyPaid();
+        return;
+      }
+
+      if (!paymentResult.success || !paymentResult.payment_url) {
+        throw new Error('Не получен URL для оплаты');
+      }
+
+      // Сохраняем order_id для последующей проверки
+      localStorage.setItem('apml_payment_order_id', paymentResult.payment_order_id);
+
+      console.log('✅ Перенаправление на страницу оплаты...');
+
+      // Перенаправляем на страницу оплаты ЮKassa
+      window.location.href = paymentResult.payment_url;
+
+    } catch (error) {
+      console.error('❌ Ошибка:', error);
+
+      showLoading(false);
+
+      // Разблокируем кнопку
+      button.disabled = false;
+      button.textContent = originalText;
+
+      // Показываем ошибку пользователю
+      let errorMessage = 'Произошла ошибка при создании платежа. ';
+
+      if (error.message.includes('уже оплатила')) {
+        errorMessage = 'Ваша команда уже оплатила участие в турнире.';
+        setTimeout(() => {
+          window.location.href = SUCCESS_PAGE_URL;
+        }, 2000);
+      } else {
+        errorMessage += 'Пожалуйста, попробуйте еще раз или свяжитесь с организаторами.';
+      }
+
+      alert(errorMessage);
+    }
+  }
+
+  /**
+   * Поиск и настройка кнопки оплаты на странице Tilda
+   */
+  function setupPaymentButton() {
+    console.log('🔍 Поиск кнопки оплаты на странице...');
+
+    // Различные селекторы для поиска кнопки
+    const buttonSelectors = [
+      'a[href*="payment"]',
+      'button:contains("оплатить")',
+      'a:contains("оплатить")',
+      '.t-btn:contains("оплатить")',
+      'a.t-btn',
+      'button.t-btn'
+    ];
+
+    let button = null;
+
+    // Пробуем найти кнопку по разным селекторам
+    for (const selector of buttonSelectors) {
+      try {
+        const elements = document.querySelectorAll(selector);
+        for (const el of elements) {
+          const text = el.textContent.toLowerCase();
+          if (text.includes('оплат') || text.includes('зарегистр')) {
+            button = el;
+            break;
+          }
+        }
+        if (button) break;
+      } catch (e) {
+        // Игнорируем ошибки селекторов
+      }
+    }
+
+    // Если не нашли кнопку автоматически, создаем свою
+    if (!button) {
+      console.warn('⚠️ Кнопка оплаты не найдена автоматически. Создание собственной кнопки...');
+
+      button = document.createElement('button');
+      button.textContent = 'Оплатить участие';
+      button.style.cssText = `
+        display: block;
+        width: 100%;
+        max-width: 400px;
+        margin: 20px auto;
+        padding: 15px 30px;
+        font-size: 18px;
+        font-weight: bold;
+        color: white;
+        background: #4CAF50;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      `;
+
+      button.onmouseover = () => button.style.background = '#45a049';
+      button.onmouseout = () => button.style.background = '#4CAF50';
+
+      document.getElementById('apml-payment-container').appendChild(button);
+    }
+
+    button.id = 'apml-payment-button';
+
+    // Удаляем существующие обработчики
+    const newButton = button.cloneNode(true);
+    button.parentNode.replaceChild(newButton, button);
+
+    // Добавляем наш обработчик
+    newButton.addEventListener('click', handlePaymentButtonClick);
+
+    console.log('✅ Кнопка оплаты настроена');
+    return newButton;
+  }
+
+  /**
+   * Инициализация страницы
+   */
+  function init() {
+    console.log('🚀 Инициализация страницы оплаты...');
+
+    // Проверка конфигурации
+    if (BACKEND_API_URL.includes('YOUR-BACKEND-URL')) {
+      console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: Не настроен URL backend сервера!');
+      console.error('Откройте код Zero Block и замените YOUR-BACKEND-URL на реальный URL');
+      alert('Ошибка конфигурации: backend URL не настроен. Обратитесь к администратору.');
+      return;
+    }
+
+    // Получаем данные регистрации
+    const registrationData = getRegistrationData();
+
+    if (!registrationData) {
+      // Нет данных - показываем ошибку
+      showErrorNoData();
+      return;
+    }
+
+    // Отображаем информацию о команде
+    displayTeamInfo(registrationData);
+
+    // Настраиваем кнопку оплаты
+    setupPaymentButton();
+
+    console.log('✅ Страница оплаты готова к работе');
+  }
+
+  // Запускаем инициализацию после полной загрузки страницы
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  // Альтернативный вариант для jQuery
+  $(document).ready(function() {
+    console.log('✅ jQuery ready - обработчик оплаты активен');
+  });
+
+})();
+</script>
+
+<!--
+==============================================================
+КОНЕЦ КОДА ДЛЯ СТРАНИЦЫ ОПЛАТЫ
+==============================================================
+
+ВАЖНО ПЕРЕД ИСПОЛЬЗОВАНИЕМ:
+1. Найдите строку: const BACKEND_API_URL = 'https://YOUR-BACKEND-URL.com';
+2. Замените YOUR-BACKEND-URL.com на URL вашего backend сервера
+3. Например: 'https://apml-payment.herokuapp.com'
+   или: 'https://your-server.com'
+
+ТЕСТИРОВАНИЕ:
+1. Откройте консоль браузера (F12)
+2. Убедитесь что в localStorage есть данные регистрации
+3. Страница должна отобразить информацию о команде
+4. При клике на кнопку должен создаться платеж
+5. Вы должны быть перенаправлены на страницу оплаты ЮKassa
+
+ПРОВЕРКА localStorage:
+В консоли браузера выполните:
+  localStorage.getItem('apml_registration_data')
+
+Должен вернуться JSON с данными команды
+
+ВОЗМОЖНЫЕ ПРОБЛЕМЫ:
+- Если не отображается информация о команде:
+  * Проверьте localStorage
+  * Убедитесь что прошли через страницу регистрации
+
+- Если ошибка при создании платежа:
+  * Проверьте URL backend сервера
+  * Проверьте что сервер запущен и доступен
+  * Откройте Network tab в DevTools и проверьте ответ API
+
+- Если кнопка не работает:
+  * Проверьте консоль на ошибки JavaScript
+  * Убедитесь что jQuery загружен (Tilda загружает автоматически)
+==============================================================
+-->

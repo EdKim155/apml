@@ -1,0 +1,225 @@
+<!--
+==============================================================
+КОД ДЛЯ СТРАНИЦЫ РЕГИСТРАЦИИ (ZERO BLOCK)
+==============================================================
+Страница: https://apml.online/squad-masters-reg-21nov2025-group-a
+
+ИНСТРУКЦИЯ ПО УСТАНОВКЕ:
+1. Откройте страницу регистрации в редакторе Tilda
+2. Добавьте блок "T123: Zero Block" после формы регистрации
+3. Скопируйте весь код ниже в HTML-редактор Zero Block
+4. Сохраните и опубликуйте страницу
+
+ВАЖНО: Этот код должен быть размещен ПОСЛЕ блока с формой Tilda!
+==============================================================
+-->
+
+<script>
+/**
+ * APML Squad Masters - Обработчик успешной регистрации
+ *
+ * Этот скрипт выполняет следующие действия:
+ * 1. Отслеживает событие успешной отправки формы Tilda
+ * 2. Извлекает все данные из формы
+ * 3. Сохраняет данные в localStorage для передачи на страницу оплаты
+ * 4. Автоматически перенаправляет на страницу оплаты
+ */
+
+(function() {
+  'use strict';
+
+  console.log('✅ Скрипт обработки регистрации загружен');
+
+  // URL страницы оплаты
+  const PAYMENT_PAGE_URL = 'https://apml.online/groupa-payments-squad-masters-21nov';
+
+  /**
+   * Извлечение данных из формы Tilda
+   * @param {jQuery} form - jQuery объект формы
+   * @returns {Object} - Объект с данными формы
+   */
+  function extractFormData(form) {
+    const formData = {};
+
+    // Находим все поля формы
+    const inputs = form.find('input, select, textarea');
+
+    inputs.each(function() {
+      const input = $(this);
+      const name = input.attr('name');
+      const value = input.val();
+
+      // Сохраняем только поля с именами (пропускаем служебные)
+      if (name && name !== 'tildaspec-cookie' && name !== 'tildaspec-referer') {
+        formData[name] = value || '';
+      }
+    });
+
+    console.log('📝 Извлеченные данные формы:', formData);
+    return formData;
+  }
+
+  /**
+   * Сохранение данных регистрации в localStorage
+   * @param {Object} formData - Данные формы
+   */
+  function saveRegistrationData(formData) {
+    // Создаем объект с данными для передачи на страницу оплаты
+    const registrationData = {
+      // Основные поля
+      TeamName: formData.TeamName || '',
+      Group_qual: formData.Group_qual || '',
+      Manager: formData.Manager || '',
+
+      // Капитан (игрок 1)
+      nickname_Telegram_captain: formData.nickname_Telegram_captain || '',
+      Nick_Pubg_captain: formData.Nick_Pubg_captain || '',
+      id_Pubg_captain: formData.id_Pubg_captain || '',
+
+      // Игрок 2
+      nickname_Telegram_teammate2: formData.nickname_Telegram_teammate2 || '',
+      Nick_Pubg_teammate2: formData.Nick_Pubg_teammate2 || '',
+      id_Pubg_teammate2: formData.id_Pubg_teammate2 || '',
+
+      // Игрок 3
+      nickname_Telegram_teammate3: formData.nickname_Telegram_teammate3 || '',
+      Nick_Pubg_teammate3: formData.Nick_Pubg_teammate3 || '',
+      id_Pubg_teammate3: formData.id_Pubg_teammate3 || '',
+
+      // Игрок 4
+      nickname_Telegram_teammate4: formData.nickname_Telegram_teammate4 || '',
+      Nick_Pubg_teammate4: formData.Nick_Pubg_teammate4 || '',
+      id_Pubg_teammate4: formData.id_Pubg_teammate4 || '',
+
+      // Игрок 5 (резерв)
+      nickname_Telegram_teammate5: formData.nickname_Telegram_teammate5 || '',
+      Nick_Pubg_teammate5: formData.Nick_Pubg_teammate5 || '',
+      id_Pubg_teammate5: formData.id_Pubg_teammate5 || '',
+
+      // Метаданные
+      registration_timestamp: Date.now(), // Timestamp для связи с записью в Google Sheets
+      registered_at: new Date().toISOString() // Читаемая дата
+    };
+
+    // Сохраняем в localStorage
+    try {
+      localStorage.setItem('apml_registration_data', JSON.stringify(registrationData));
+      console.log('✅ Данные сохранены в localStorage');
+      console.log('📦 Данные:', registrationData);
+      return true;
+    } catch (error) {
+      console.error('❌ Ошибка сохранения в localStorage:', error);
+      alert('Ошибка сохранения данных. Пожалуйста, попробуйте еще раз.');
+      return false;
+    }
+  }
+
+  /**
+   * Перенаправление на страницу оплаты
+   */
+  function redirectToPaymentPage() {
+    console.log('🔄 Перенаправление на страницу оплаты...');
+
+    // Небольшая задержка для гарантии сохранения в localStorage
+    setTimeout(function() {
+      window.location.href = PAYMENT_PAGE_URL;
+    }, 800);
+  }
+
+  /**
+   * Обработчик успешной отправки формы
+   */
+  function handleFormSuccess(event, form, data) {
+    console.log('🎉 Форма успешно отправлена!');
+    console.log('📋 Event:', event);
+    console.log('📋 Form:', form);
+    console.log('📋 Data:', data);
+
+    // Извлекаем данные из формы
+    const formData = extractFormData($(form));
+
+    // Проверяем наличие обязательных полей
+    if (!formData.TeamName) {
+      console.error('❌ Отсутствует название команды!');
+      alert('Ошибка: не указано название команды');
+      return;
+    }
+
+    if (!formData.nickname_Telegram_captain) {
+      console.error('❌ Отсутствует Telegram капитана!');
+      alert('Ошибка: не указан Telegram капитана');
+      return;
+    }
+
+    // Сохраняем данные
+    const saved = saveRegistrationData(formData);
+
+    if (saved) {
+      // Перенаправляем на страницу оплаты
+      redirectToPaymentPage();
+    }
+  }
+
+  /**
+   * Инициализация: подписка на событие успешной отправки формы
+   */
+  function init() {
+    console.log('🚀 Инициализация обработчика регистрации...');
+
+    // Подписываемся на событие Tilda
+    $(document).on('tildaform:aftersuccess', function(event, form, data) {
+      handleFormSuccess(event, form, data);
+    });
+
+    console.log('✅ Обработчик подписан на событие tildaform:aftersuccess');
+  }
+
+  // Запускаем инициализацию после загрузки DOM
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  // Альтернативный вариант для jQuery
+  $(document).ready(function() {
+    console.log('✅ jQuery ready - обработчик регистрации активен');
+  });
+
+})();
+</script>
+
+<!-- Стили (опционально, для отладки) -->
+<style>
+/* Скрыть этот блок, так как он содержит только скрипты */
+#rec-script-handler {
+  display: none !important;
+}
+</style>
+
+<!--
+==============================================================
+КОНЕЦ КОДА ДЛЯ СТРАНИЦЫ РЕГИСТРАЦИИ
+==============================================================
+
+ТЕСТИРОВАНИЕ:
+1. Откройте консоль браузера (F12)
+2. Заполните форму регистрации
+3. Отправьте форму
+4. В консоли должны появиться сообщения:
+   - "✅ Скрипт обработки регистрации загружен"
+   - "🎉 Форма успешно отправлена!"
+   - "✅ Данные сохранены в localStorage"
+   - "🔄 Перенаправление на страницу оплаты..."
+5. Проверьте localStorage:
+   - Откройте Application → Local Storage в DevTools
+   - Найдите ключ "apml_registration_data"
+   - Убедитесь, что данные сохранены
+6. Вы должны автоматически перейти на страницу оплаты
+
+ВОЗМОЖНЫЕ ПРОБЛЕМЫ:
+- Если перенаправление не работает, проверьте URL страницы оплаты
+- Если данные не сохраняются, проверьте настройки приватности браузера
+- Если скрипт не запускается, убедитесь что jQuery загружен (Tilda загружает его автоматически)
+==============================================================
+-->

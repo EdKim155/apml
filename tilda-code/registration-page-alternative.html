@@ -1,0 +1,93 @@
+<!--
+==============================================================
+АЛЬТЕРНАТИВНЫЙ КОД ДЛЯ СТРАНИЦЫ РЕГИСТРАЦИИ
+==============================================================
+Используйте ЭТОТ код, если основной не работает из-за настроек Tilda
+
+УСТАНОВКА:
+Добавьте в самый конец блока T123 после существующего кода счетчика
+==============================================================
+-->
+
+<script>
+console.log('✅ Альтернативный скрипт перенаправления загружен');
+
+(function() {
+  'use strict';
+
+  var PAYMENT_PAGE_URL = 'https://apml.online/groupa-payments-squad-masters-21nov';
+  var formSubmitted = false;
+
+  // Перехватываем ДО отправки формы
+  function interceptForm() {
+    var forms = document.querySelectorAll('form');
+
+    forms.forEach(function(form) {
+      // Проверяем, что это форма регистрации (по наличию нужных полей)
+      var hasTeamName = form.querySelector('[name="TeamName"]');
+      var hasCaptain = form.querySelector('[name="nickname_Telegram_captain"]');
+
+      if (hasTeamName && hasCaptain && !form.dataset.intercepted) {
+        form.dataset.intercepted = 'true';
+        console.log('🎯 Форма найдена и перехвачена:', form);
+
+        form.addEventListener('submit', function(e) {
+          console.log('📝 Форма отправляется...');
+
+          if (!formSubmitted) {
+            formSubmitted = true;
+
+            // Собираем данные
+            var teamName = form.querySelector('[name="TeamName"]').value;
+            var captain = form.querySelector('[name="nickname_Telegram_captain"]').value;
+            var groupField = form.querySelector('[name="Group_qual"]');
+            var group = groupField ? groupField.value : '';
+
+            var dataToSave = {
+              TeamName: teamName,
+              nickname_Telegram_captain: captain,
+              Group_qual: group
+            };
+
+            localStorage.setItem('apml_registration_data', JSON.stringify(dataToSave));
+            console.log('💾 Данные сохранены:', dataToSave);
+          }
+        });
+      }
+    });
+  }
+
+  // Также слушаем событие Tilda
+  $(document).on('tildaform:aftersuccess', function(event, form) {
+    console.log('📝 Событие tildaform:aftersuccess сработало');
+
+    if (formSubmitted) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
+      console.log('🚀 Перенаправление через 1 секунду...');
+
+      setTimeout(function() {
+        console.log('🚀 Переход на:', PAYMENT_PAGE_URL);
+        window.location.href = PAYMENT_PAGE_URL;
+      }, 1000);
+
+      return false;
+    }
+  });
+
+  // Запускаем перехват форм
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(interceptForm, 500);
+    });
+  } else {
+    setTimeout(interceptForm, 500);
+  }
+
+  // Повторяем попытку через 2 секунды на случай динамической загрузки
+  setTimeout(interceptForm, 2000);
+
+})();
+</script>

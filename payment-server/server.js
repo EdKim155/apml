@@ -178,12 +178,25 @@ async function createCodeePayPayment(orderData) {
       method: orderData.method
     });
 
+    // Определяем success_url в зависимости от группы
+    let successUrl = process.env.FRONTEND_SUCCESS_URL;
+
+    // Проверяем группу и выбираем соответствующий URL
+    if (orderData.group && orderData.group.includes('Группа Б')) {
+      successUrl = process.env.SUCCESS_URL_GROUP_B || successUrl;
+    } else if (orderData.group && orderData.group.includes('Группа В')) {
+      successUrl = process.env.SUCCESS_URL_GROUP_C || successUrl;
+    } else if (orderData.group && orderData.group.includes('Группа А')) {
+      successUrl = process.env.SUCCESS_URL_GROUP_A || successUrl;
+    }
+
     const response = await axios.post(
       `${CODEEPAY_API_URL}/initiate_payment`,
       {
         order_id: orderData.order_id,
         amount: orderData.amount,
         method: orderData.method, // 'sbp' или 'card'
+        success_url: successUrl, // URL для перенаправления после оплаты
         metadata: {
           team_name: orderData.team_name,
           captain_telegram: orderData.captain_telegram,

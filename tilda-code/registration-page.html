@@ -1,0 +1,59 @@
+<!--
+==============================================================
+МИНИМАЛИСТИЧНЫЙ КОД ДЛЯ СТРАНИЦЫ РЕГИСТРАЦИИ
+==============================================================
+Страница: https://apml.online/squad-masters-reg-21nov2025-group-a
+
+УСТАНОВКА:
+1. Откройте страницу в редакторе Tilda
+2. Добавьте блок "T123: Zero Block"
+3. Вставьте код ниже (только <script> блок)
+4. Сохраните и опубликуйте
+
+Этот скрипт работает ПОЛНОСТЬЮ В ФОНЕ без визуальных элементов
+==============================================================
+-->
+
+<script>
+(function() {
+  'use strict';
+
+  const PAYMENT_PAGE_URL = 'https://apml.online/groupa-payments-squad-masters-21nov';
+
+  // Перехватываем успешную отправку формы Tilda
+  $(document).on('tildaform:aftersuccess', function(event, form) {
+    try {
+      // Извлекаем данные из формы
+      const formData = {};
+      $(form).find('input, select, textarea').each(function() {
+        const name = $(this).attr('name');
+        const value = $(this).val();
+        if (name && name !== 'tildaspec-cookie' && name !== 'tildaspec-referer') {
+          formData[name] = value || '';
+        }
+      });
+
+      // Проверяем обязательные поля
+      if (!formData.TeamName || !formData.nickname_Telegram_captain) {
+        return; // Если нет данных, не перенаправляем
+      }
+
+      // Сохраняем в localStorage
+      localStorage.setItem('apml_registration_data', JSON.stringify({
+        TeamName: formData.TeamName,
+        nickname_Telegram_captain: formData.nickname_Telegram_captain,
+        Group_qual: formData.Group_qual || ''
+      }));
+
+      // Автоматическое перенаправление через 500ms
+      setTimeout(function() {
+        window.location.href = PAYMENT_PAGE_URL;
+      }, 500);
+
+    } catch (error) {
+      console.error('Ошибка обработки формы:', error);
+    }
+  });
+
+})();
+</script>

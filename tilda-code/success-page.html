@@ -1,0 +1,124 @@
+<!--
+==============================================================
+МИНИМАЛИСТИЧНЫЙ КОД ДЛЯ СТРАНИЦЫ УСПЕХА
+==============================================================
+Страница: https://apml.online/groupa-reg-squad-masters-success-21nov
+
+УСТАНОВКА:
+1. Откройте страницу в редакторе Tilda
+2. Добавьте блок "T123: Zero Block"
+3. Вставьте код ниже
+4. ВАЖНО: Замените YOUR-BACKEND-URL на https://ucnominal.ru
+5. На странице должна быть ссылка на Telegram с href="https://t.me/+StEnmHkKvGdlNmUy"
+6. Добавьте к ссылке style="display:none" - скрипт покажет её автоматически
+7. Сохраните и опубликуйте
+
+Этот скрипт работает ПОЛНОСТЬЮ В ФОНЕ без визуальных элементов
+==============================================================
+-->
+
+<script>
+(function() {
+  'use strict';
+
+  // ВАЖНО: Замените на ваш backend URL
+  const BACKEND_API_URL = 'https://YOUR-BACKEND-URL';
+
+  // Получаем данные из localStorage
+  function getStoredData() {
+    try {
+      const registrationData = localStorage.getItem('apml_registration_data');
+      return registrationData ? JSON.parse(registrationData) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // Проверка статуса оплаты на сервере
+  async function checkPaymentStatus(teamName) {
+    try {
+      const response = await fetch(`${BACKEND_API_URL}/api/check-payment/${encodeURIComponent(teamName)}`);
+      const data = await response.json();
+      return data.paid === true;
+    } catch (error) {
+      console.error('Ошибка проверки оплаты:', error);
+      return false;
+    }
+  }
+
+  // Поиск ссылки на Telegram
+  function findTelegramLink() {
+    // Ищем ссылку с t.me
+    const links = document.querySelectorAll('a[href*="t.me"]');
+    if (links.length > 0) return links[0];
+
+    // Ищем по ID
+    const linkById = document.getElementById('telegram-chat-link');
+    if (linkById) return linkById;
+
+    return null;
+  }
+
+  // Показать ссылку на Telegram
+  function showTelegramLink() {
+    const link = findTelegramLink();
+    if (link) {
+      link.style.display = '';
+      link.style.visibility = 'visible';
+      link.style.opacity = '1';
+    }
+  }
+
+  // Скрыть ссылку на Telegram
+  function hideTelegramLink() {
+    const link = findTelegramLink();
+    if (link) {
+      link.style.display = 'none';
+      link.style.visibility = 'hidden';
+      link.style.opacity = '0';
+    }
+  }
+
+  // Очистка localStorage
+  function clearStoredData() {
+    try {
+      localStorage.removeItem('apml_registration_data');
+      localStorage.removeItem('apml_payment_order_id');
+    } catch (error) {
+      console.error('Ошибка очистки localStorage:', error);
+    }
+  }
+
+  // Основная логика
+  async function init() {
+    const registrationData = getStoredData();
+
+    // Если нет данных, скрываем ссылку
+    if (!registrationData || !registrationData.TeamName) {
+      hideTelegramLink();
+      return;
+    }
+
+    // Проверяем статус оплаты
+    const isPaid = await checkPaymentStatus(registrationData.TeamName);
+
+    if (isPaid) {
+      // Оплата подтверждена - показываем ссылку на Telegram
+      showTelegramLink();
+      // Очищаем localStorage
+      clearStoredData();
+    } else {
+      // Оплата не подтверждена - скрываем ссылку
+      hideTelegramLink();
+    }
+  }
+
+  // Запуск после загрузки страницы
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+})();
+</script>

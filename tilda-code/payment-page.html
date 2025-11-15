@@ -1,0 +1,147 @@
+<!--
+==============================================================
+МИНИМАЛИСТИЧНЫЙ КОД ДЛЯ СТРАНИЦЫ ОПЛАТЫ
+==============================================================
+Страница: https://apml.online/groupa-payments-squad-masters-21nov
+
+УСТАНОВКА:
+1. Откройте страницу в редакторе Tilda
+2. Добавьте блок "T123: Zero Block"
+3. Вставьте код ниже
+4. ВАЖНО: Замените YOUR-BACKEND-URL на https://ucnominal.ru
+5. Сохраните и опубликуйте
+
+Этот скрипт работает ПОЛНОСТЬЮ В ФОНЕ без визуальных элементов
+==============================================================
+-->
+
+<script>
+(function() {
+  'use strict';
+
+  // ВАЖНО: Замените на ваш backend URL
+  const BACKEND_API_URL = 'https://YOUR-BACKEND-URL';
+  const PAYMENT_AMOUNT = 5000;
+
+  // Получаем данные из localStorage
+  function getRegistrationData() {
+    try {
+      const data = localStorage.getItem('apml_registration_data');
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // Создание платежа
+  async function createPayment(registrationData) {
+    try {
+      const response = await fetch(`${BACKEND_API_URL}/api/create-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          team_name: registrationData.TeamName,
+          captain_telegram: registrationData.nickname_Telegram_captain,
+          group: registrationData.Group_qual || 'Группа А: 21 ноября 18.00 мск',
+          amount: PAYMENT_AMOUNT,
+          method: 'sbp' // Можно изменить на 'card'
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Ошибка создания платежа');
+      }
+
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Инициализация при загрузке страницы
+  function init() {
+    const registrationData = getRegistrationData();
+
+    // Если нет данных, перенаправляем на регистрацию
+    if (!registrationData) {
+      window.location.href = 'https://apml.online/squad-masters-reg-21nov2025-group-a';
+      return;
+    }
+
+    // Ищем кнопку оплаты на странице
+    // Tilda обычно использует классы .t-btn, .t-submit
+    const findButton = () => {
+      const selectors = [
+        'a.t-btn',
+        'button.t-btn',
+        'a[href*="payment"]',
+        'button[type="submit"]',
+        '.t-submit'
+      ];
+
+      for (const selector of selectors) {
+        const buttons = document.querySelectorAll(selector);
+        for (const btn of buttons) {
+          const text = btn.textContent.toLowerCase();
+          if (text.includes('оплат') || text.includes('регистр')) {
+            return btn;
+          }
+        }
+      }
+      return null;
+    };
+
+    // Ждем загрузки DOM
+    const setupButton = () => {
+      const button = findButton();
+
+      if (!button) {
+        // Если кнопка не найдена, попробуем еще раз через секунду
+        setTimeout(setupButton, 1000);
+        return;
+      }
+
+      // Перехватываем клик
+      button.addEventListener('click', async function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Блокируем кнопку
+        button.disabled = true;
+        const originalText = button.textContent;
+        button.textContent = 'Обработка...';
+
+        try {
+          // Создаем платеж
+          const payment = await createPayment(registrationData);
+
+          // Сохраняем order_id
+          localStorage.setItem('apml_payment_order_id', payment.payment_order_id);
+
+          // Перенаправляем на страницу оплаты
+          window.location.href = payment.payment_url;
+
+        } catch (error) {
+          // Разблокируем кнопку при ошибке
+          button.disabled = false;
+          button.textContent = originalText;
+          console.error('Ошибка:', error);
+        }
+      });
+    };
+
+    // Запускаем поиск кнопки после загрузки
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', setupButton);
+    } else {
+      setupButton();
+    }
+  }
+
+  // Запуск
+  init();
+
+})();
+</script>
